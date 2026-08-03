@@ -55,15 +55,3 @@ Once it's live on GitHub Pages (installing only works over `https://`, not from 
 **Android (Chrome)**: open the link → tap the **⋮** menu → **"Add to Home screen"** / **"Install app"**. It gets its own icon and opens full-screen, like a real app.
 
 **iPhone (Safari)**: open the link → tap the **Share** icon → **"Add to Home Screen"**. Same result.
-
-No app store, no review process, no developer fee — this is what makes a PWA (Progressive Web App) the free path to something install-able. A "real" app-store app is a separate, bigger project (rebuilt in a mobile framework, plus a $25 one-time Google Play fee or $99/year Apple fee) — not needed unless you specifically want store listing/discovery later.
-
-## Notes & options
-- **Basemap**: Google Hybrid (satellite + labels), pulled from Google's public tile endpoint. This works without any sign-up or billing, but it's an unofficial method (not the sanctioned Maps JavaScript API), so Google could change or block it without warning. If that ever happens, a solid free fallback is Esri's World Imagery hybrid basemap through your ArcGIS Online account.
-- **Safety labels**: "Safe" (cyan, checkmark), "Safe during day time" (amber, sun), "Unsafe" (red, warning triangle) — shown as colored pin markers and in the legend top-right.
-- **Routing profile**: the app requests walking directions (`/foot/`). If you'd rather route by car, change `foot` to `driving` in the `routeTo()` function in `index.html`.
-- **ArcGIS Online**: you don't need it for tiles/routing in this version. If later you want to manage site data through ArcGIS's dashboard instead of editing the code, that's a reasonable v2 upgrade, but it adds complexity (API keys, credit budgeting) that isn't needed to get this working.
-- **OSRM public server**: it's rate-limited and meant for light/demo use, which fits a personal project fine. If it ever feels slow or you want a dedicated routing backend, OpenRouteService offers a free API key with a much higher limit — happy to wire that in later if needed.
-
-## If you get stuck
-Come back with the error or what's not working — happy to debug specific pieces.
