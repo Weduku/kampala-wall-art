@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kampala Wall Art — Mural &amp; Graffiti Map</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#17181C">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wall Art">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#17181C;         /* asphalt night */
+    --ink-2:#212228;       /* panel */
+    --chalk:#F2F0EA;       /* off-white text */
+    --chalk-dim:#A9A8AD;   /* muted text */
+    --magenta:#E63E8C;     /* brand accent */
+    --amber:#F5B729;       /* spray-paint gold — SAFE DURING DAY */
+    --cyan:#31D8C9;        /* spray-paint teal — SAFE */
+    --red:#E5484D;         /* warning red — UNSAFE */
+    --line:#34353C;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--ink);
+    color:var(--chalk);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+  }
+
+  #map{
+    position:absolute;
+    inset:0;
+  }
+
+  /* ---- Top bar ---- */
+  header{
+    position:absolute;
+    top:0; left:0; right:0;
+    z-index:1000;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 20px;
+    background:linear-gradient(180deg, rgba(23,24,28,0.95) 0%, rgba(23,24,28,0.0) 100%);
+    pointer-events:none;
+  }
+  header .brand{
+    font-family:'Archivo Black', sans-serif;
+    font-size:clamp(18px,3vw,26px);
+    letter-spacing:0.5px;
+    line-height:1;
+    text-transform:uppercase;
+    pointer-events:auto;
+  }
+  header .brand span{ color:var(--magenta); }
+  header .tagline{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--chalk-dim);
+    margin-top:4px;
+    letter-spacing:0.5px;
+  }
+
+  /* ---- Legend ---- */
+  .legend{
+    position:absolute;
+    top:18px; right:18px;
+    z-index:1000;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:10px 14px;
+    display:flex;
+    gap:16px;
+    font-size:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+  }
+  .legend .item{ display:flex; align-items:center; gap:6px; color:var(--chalk-dim); }
+  .legend .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .legend .dot.day{ background:var(--amber); }
+  .legend .dot.safe{ background:var(--cyan); }
+  .legend .dot.unsafe{ background:var(--red); }
+
+  /* ---- Markers ---- */
+  .mural-pin{
+    width:34px; height:34px;
+    border-radius:50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 10px rgba(0,0,0,0.45);
+    border:2px solid rgba(23,24,28,0.6);
+  }
+  .mural-pin .icon-inner{
+    transform: rotate(45deg);
+    font-size:15px;
+  }
+  .mural-pin.day{ background:var(--amber); }
+  .mural-pin.safe{ background:var(--cyan); }
+  .mural-pin.unsafe{ background:var(--red); }
+
+  /* ---- Popup styling ---- */
+  .leaflet-popup-content-wrapper{
+    background:var(--ink-2);
+    color:var(--chalk);
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    padding:0;
+    overflow:hidden;
+  }
+  .leaflet-popup-content{ margin:0; width:260px !important; }
+  .leaflet-popup-tip{ background:var(--ink-2); }
+  .leaflet-popup-close-button{ color:var(--chalk-dim) !important; }
+
+  .popup-photo{
+    width:100%; height:150px;
+    object-fit:cover;
+    display:block;
+    background:#0000;
+    border-bottom:1px solid var(--line);
+  }
+  .popup-body{ padding:14px 16px 16px; }
+  .popup-eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:0.8px;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .popup-eyebrow.day{ color:var(--amber); }
+  .popup-eyebrow.safe{ color:var(--cyan); }
+  .popup-eyebrow.unsafe{ color:var(--red); }
+
+  .popup-title{
+    font-family:'Archivo Black', sans-serif;
+    font-size:17px;
+    line-height:1.15;
+    margin:0 0 4px;
+    text-transform:uppercase;
+  }
+  .popup-artist{
+    font-size:13px;
+    color:var(--chalk-dim);
+    margin:0 0 10px;
+  }
+  .popup-artist b{ color:var(--chalk); font-weight:600; }
+  .popup-desc{
+    font-size:12.5px;
+    color:var(--chalk-dim);
+    line-height:1.4;
+    margin:0 0 14px;
+  }
+
+  .btn-route{
+    width:100%;
+    border:none;
+    border-radius:8px;
+    padding:10px 12px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+    background:var(--chalk);
+    color:var(--ink);
+    transition:transform 0.12s ease, opacity 0.12s ease;
+  }
+  .btn-route:hover{ opacity:0.85; }
+  .btn-route:active{ transform:scale(0.97); }
+
+  /* ---- Route info panel ---- */
+  #route-panel{
+    position:absolute;
+    bottom:18px; left:18px;
+    z-index:1000;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    max-width:280px;
+    display:none;
+    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+  }
+  #route-panel.show{ display:block; }
+  #route-panel .r-title{
+    font-family:'Archivo Black', sans-serif;
+    font-size:13px;
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  #route-panel .r-stats{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--chalk-dim);
+    margin:0 0 10px;
+  }
+  #route-panel .r-close{
+    background:none; border:1px solid var(--line); color:var(--chalk-dim);
+    border-radius:6px; padding:5px 10px; font-size:11px; cursor:pointer;
+  }
+  #route-panel .r-close:hover{ color:var(--chalk); }
+
+  /* ---- Attribution tweak ---- */
+  .leaflet-control-attribution{
+    background:rgba(23,24,28,0.75) !important;
+    color:var(--chalk-dim) !important;
+  }
+  .leaflet-control-attribution a{ color:var(--chalk-dim) !important; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<header>
+  <div>
+    <div class="brand">Kampala <span>Wall Art</span></div>
+    <div class="tagline">MURALS &amp; GRAFFITI — FIND IT, SEE IT, GET THERE</div>
+  </div>
+</header>
+
+<div class="legend">
+  <div class="item"><span class="dot safe"></span>Safe</div>
+  <div class="item"><span class="dot day"></span>Safe during day time</div>
+  <div class="item"><span class="dot unsafe"></span>Unsafe</div>
+</div>
+
+<div id="route-panel">
+  <div class="r-title" id="r-title">Route</div>
+  <div class="r-stats" id="r-stats"></div>
+  <button class="r-close" onclick="clearRoute()">Clear route</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+/* ============================================================
+   1. SITE DATA
+   ------------------------------------------------------------
+   Replace this array with your real mural/graffiti data.
+   safety: "safe" | "day" | "unsafe"
+   photo: filename inside the /images folder (or a full URL)
+   ============================================================ */
+const sites = [
+  {
+    id: 1,
+    name: "Unknown",
+    artist: "Unknown",
+    lat: 0.304399,
+    lng: 32.584907,
+    safety: "safe",
+    photo: "mural-1.jpg",
+    description: "Located at the Herman Padel Center entrance. Safe to visit day or night."
+  },
+  {
+    id: 2,
+    name: "Unknown",
+    artist: "Unknown",
+    lat: 0.342802,
+    lng: 32.638745,
+    safety: "unsafe",
+    photo: "mural-2.jpg",
+    description: "Located in Banda, on the fence of the Honda motor dealer, accessed through the neighboring slums. Not recommended to visit, day or night."
+  }
+];
+
+/* ============================================================
+   2. MAP SETUP
+   ============================================================ */
+const map = L.map('map', { zoomControl: false });
+const bounds = L.latLngBounds(sites.map(s => [s.lat, s.lng]));
+map.fitBounds(bounds, { padding: [80, 80] });
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Google Hybrid basemap (satellite imagery + road/place labels)
+// Note: this uses Google's public tile endpoint directly rather than the official,
+// key-based Maps JavaScript API — it's the only no-signup, no-billing way to pull
+// Google's hybrid tiles, but it's unofficial and could change without notice.
+L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+  attribution: 'Map data &copy; Google',
+  subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  maxZoom: 20
+}).addTo(map);
+
+/* ============================================================
+   3. CUSTOM ICONS
+   ============================================================ */
+function iconFor(safety){
+  const symbol = safety === 'day' ? '☀' : safety === 'unsafe' ? '⚠' : '✓';
+  return L.divIcon({
+    className: '',
+    html: `<div class="mural-pin ${safety}"><div class="icon-inner">${symbol}</div></div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -30]
+  });
+}
+
+/* ============================================================
+   4. MARKERS + POPUPS
+   ============================================================ */
+const markers = {};
+
+sites.forEach(site => {
+  const marker = L.marker([site.lat, site.lng], { icon: iconFor(site.safety) }).addTo(map);
+
+  const safetyLabel = site.safety === 'day' ? 'Safe during day time'
+                     : site.safety === 'unsafe' ? 'Unsafe'
+                     : 'Safe';
+
+  const popupHtml = `
+    <img class="popup-photo" src="images/${site.photo}" alt="${site.name}"
+         onerror="this.src='https://placehold.co/260x150/212228/A9A8AD?text=Add+photo';" />
+    <div class="popup-body">
+      <div class="popup-eyebrow ${site.safety}">${safetyLabel}</div>
+      <p class="popup-title">${site.name}</p>
+      <p class="popup-artist">Artist: <b>${site.artist}</b></p>
+      <p class="popup-desc">${site.description || ''}</p>
+      <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${site.name.replace(/'/g, "\\'")}')">
+        Get directions
+      </button>
+    </div>
+  `;
+
+  marker.bindPopup(popupHtml);
+  markers[site.id] = marker;
+});
+
+/* ============================================================
+   5. ROUTING (free — OSRM public demo server, no API key)
+   ============================================================ */
+let routeLayer = null;
+let userMarker = null;
+
+function routeTo(destLat, destLng, destName){
+  if (!navigator.geolocation) {
+    alert('Your browser does not support location. Try a different device/browser.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const userLat = pos.coords.latitude;
+    const userLng = pos.coords.longitude;
+
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker([userLat, userLng], {
+      radius: 7, color: '#31D8C9', fillColor: '#31D8C9', fillOpacity: 1, weight: 2
+    }).addTo(map).bindPopup('You are here');
+
+    const url = `https://router.project-osrm.org/route/v1/foot/${userLng},${userLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.routes || !data.routes.length) {
+        alert('Could not find a walking route to this site.');
+        return;
+      }
+
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+      if (routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.polyline(coords, { color: '#F5B729', weight: 5, opacity: 0.85 }).addTo(map);
+
+      map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
+
+      const km = (route.distance / 1000).toFixed(1);
+      const mins = Math.round(route.duration / 60);
+
+      document.getElementById('r-title').textContent = `Walking to ${destName}`;
+      document.getElementById('r-stats').textContent = `${km} km · ~${mins} min on foot`;
+      document.getElementById('route-panel').classList.add('show');
+
+    } catch (err) {
+      console.error(err);
+      alert('Routing service is unavailable right now. Please try again shortly.');
+    }
+  }, (err) => {
+    alert('Could not get your location. Please allow location access and try again.');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function clearRoute(){
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+  document.getElementById('route-panel').classList.remove('show');
+}
+
+/* ============================================================
+   6. PWA — makes "Add to Home Screen" / Install available
+   ============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed', err));
+  });
+}
+</script>
+</body>
+</html>
