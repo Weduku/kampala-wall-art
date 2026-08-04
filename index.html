@@ -315,9 +315,29 @@
     text-align:center;
     max-width:260px;
   }
+
+  /* ---- Offline banner ---- */
+  #offline-banner{
+    position:absolute;
+    top:0; left:0; right:0;
+    z-index:1100;
+    background:#F5B729;
+    color:#17181C;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    font-weight:600;
+    text-align:center;
+    padding:6px 12px;
+    letter-spacing:0.3px;
+    transform:translateY(-100%);
+    transition:transform 0.2s ease;
+  }
+  #offline-banner.show{ transform:translateY(0); }
 </style>
 </head>
 <body>
+
+<div id="offline-banner">You're offline — showing saved murals. Directions need a connection.</div>
 
 <div id="map"></div>
 
@@ -537,7 +557,9 @@ async function loadSites(){
 
   } catch (err) {
     console.error(err);
-    statusEl.textContent = 'Could not load mural data. Check the sheet link and publish settings.';
+    statusEl.textContent = navigator.onLine
+      ? 'Could not load mural data. Check the sheet link and publish settings.'
+      : "You're offline and this device hasn't loaded mural data before — connect once to load it, then it'll be available offline after that.";
   }
 }
 
@@ -614,6 +636,11 @@ async function fetchOsrmRoute(profile, fromLat, fromLng, toLat, toLng){
 }
 
 function routeTo(destLat, destLng, destName, mode){
+  if (!navigator.onLine) {
+    alert("Directions need an internet connection. You can still browse murals and their photos offline.");
+    return;
+  }
+
   if (!navigator.geolocation) {
     alert('Your browser does not support location. Try a different device/browser.');
     return;
@@ -705,13 +732,22 @@ function clearRoute(){
 }
 
 /* ============================================================
-   6. PWA — makes "Add to Home Screen" / Install available
+   6. PWA — makes "Add to Home Screen" / Install available,
+      and enables offline browsing of previously-viewed data
    ============================================================ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed', err));
   });
 }
+
+const offlineBanner = document.getElementById('offline-banner');
+function updateOfflineBanner(){
+  offlineBanner.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+updateOfflineBanner();
 </script>
 </body>
 </html>

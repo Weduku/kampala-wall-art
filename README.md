@@ -73,6 +73,16 @@ Just double-click `index.html` to open it in a browser. Geolocation (for routing
 
 That's your live app — free hosting, free HTTPS, shareable link.
 
+## Works offline (partially, by design)
+Once someone has opened the app with a connection at least once, it keeps working with no signal for:
+- **The map** — any area/zoom level they've already viewed gets cached and stays viewable.
+- **Mural data** — the last successfully loaded version of your Google Sheet.
+- **Photos** — any mural photos they've already opened.
+
+**Directions genuinely require a connection** — that's not a limitation I could remove for free; real-time routing needs a live routing server. If someone taps a directions button offline, the app tells them plainly instead of failing silently. A yellow banner also appears at the top whenever the device has no connection.
+
+First-ever visit to the app still needs an internet connection (there's nothing to cache yet) — after that, previously-seen content works offline.
+
 ## Step C — Install it on a phone
 Once it's live on GitHub Pages (installing only works over `https://`, not from a local file):
 
