@@ -21,12 +21,13 @@ Mural data now lives in a **Google Sheet**, not in the code. Once it's set up (o
 
 1. **Create the sheet.** In Google Sheets, make a new sheet with exactly these column headers in row 1 (any order, but spelled exactly like this):
 
-   | name | artist | lat | lng | safety | photo | description |
-   |------|--------|-----|-----|--------|-------|-------------|
+   | name | artist | lat | lng | safety | description | photo | year | photo2 | year2 | photo3 | year3 | photo4 | year4 |
+   |------|--------|-----|-----|--------|-------------|-------|------|--------|-------|--------|-------|--------|-------|
 
    - `safety` must be one of: `safe`, `day`, `unsafe`
    - `lat` / `lng`: right-click a spot in Google Maps, click the coordinates to copy
-   - `photo`: either a filename (e.g. `mural-3.jpg` — see photo instructions below) or a full image URL
+   - `photo`, `photo2`, `photo3`, `photo4`: up to 4 photos per site — each a filename (e.g. `mural-3.jpg`) or a full image URL. Leave later ones blank if a site has fewer photos; the app only shows however many are filled in.
+   - `year`, `year2`, `year3`, `year4`: the year each matching photo was taken — shown as a white-on-black badge on the bottom-left of that photo. Leave blank to hide the badge for that photo.
 
    **Shortcut**: this project includes `starter-data.csv` with your existing two murals already filled in. In Google Sheets: **File → Import → Upload**, select that file, choose "Replace current sheet," and you're already set up with the right columns and both existing sites.
 
@@ -77,10 +78,11 @@ Once it's live on GitHub Pages (installing only works over `https://`, not from 
 No app store, no review process, no developer fee — this is what makes a PWA (Progressive Web App) the free path to something install-able. A "real" app-store app is a separate, bigger project (rebuilt in a mobile framework, plus a $25 one-time Google Play fee or $99/year Apple fee) — not needed unless you specifically want store listing/discovery later.
 
 ## Notes & options
+- **Photo gallery**: each site can show up to 4 photos. In the popup, swipe (or use the arrow buttons) to scroll through them; dots show which photo you're on. Each photo's year appears as a white-on-black badge, bottom-left.
+- **Routing**: "Drive + walk directions" is the default — it drives as far as a road reaches, then automatically switches to a walking leg (shown as a dashed teal line) if the site sits off-road, e.g. down a footpath or through an informal settlement. "Walking directions only" is also available as a second button for anyone who'd rather walk the whole way.
 - **Basemap**: Google Hybrid (satellite + labels), pulled from Google's public tile endpoint. This works without any sign-up or billing, but it's an unofficial method (not the sanctioned Maps JavaScript API), so Google could change or block it without warning. If that ever happens, a solid free fallback is Esri's World Imagery hybrid basemap through your ArcGIS Online account.
 - **Safety labels**: "Safe" (cyan, checkmark), "Safe during day time" (amber, sun), "Unsafe" (red, warning triangle) — shown as colored pin markers and in the legend top-right.
-- **Routing profile**: the app requests walking directions (`/foot/`). If you'd rather route by car, change `foot` to `driving` in the `routeTo()` function in `index.html`.
-- **ArcGIS Online**: you don't need it for tiles/routing in this version. If later you want to manage site data through ArcGIS's dashboard instead of editing the code, that's a reasonable v2 upgrade, but it adds complexity (API keys, credit budgeting) that isn't needed to get this working.
+- **ArcGIS Online**: you don't need it for tiles/routing in this version. If later you want to manage site data through ArcGIS's dashboard instead of a Google Sheet, that's a reasonable v2 upgrade, but it adds complexity (API keys, credit budgeting) that isn't needed to get this working.
 - **OSRM public server**: it's rate-limited and meant for light/demo use, which fits a personal project fine. If it ever feels slow or you want a dedicated routing backend, OpenRouteService offers a free API key with a much higher limit — happy to wire that in later if needed.
 
 ## If you get stuck
