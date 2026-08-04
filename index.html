@@ -362,7 +362,7 @@
    The app reads the trailing "_YYYY" and shows it as the year
    badge automatically — no separate year column needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://drive.google.com/file/d/1FLtmTABibDIEeG4cFjivV5SFXSQ3VUfs/view?usp=sharing";
+const SHEET_CSV_URL = "PASTE_YOUR_PUBLISHED_GOOGLE_SHEET_CSV_LINK_HERE";
 
 /* ============================================================
    2. MAP SETUP
@@ -476,15 +476,26 @@ async function loadSites(){
     if (!res.ok) throw new Error('Sheet fetch failed: ' + res.status);
     const csvText = await res.text();
 
-    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: h => h.trim().toLowerCase()
+    });
+
+    if (!parsed.data.length) {
+      statusEl.textContent = 'Your Google Sheet looks empty — add a row with mural details.';
+      return;
+    }
+
+    const toNum = v => parseFloat(String(v || '').trim().replace(',', '.'));
 
     const sites = parsed.data
       .map((row, i) => ({
         id: i + 1,
         name: (row.name || 'Unknown').trim(),
         artist: (row.artist || 'Unknown').trim(),
-        lat: parseFloat(row.lat),
-        lng: parseFloat(row.lng),
+        lat: toNum(row.lat),
+        lng: toNum(row.lng),
         safety: (row.safety || 'safe').trim().toLowerCase(),
         description: (row.description || '').trim(),
         photo: (row.photo || '').trim(),
@@ -493,6 +504,11 @@ async function loadSites(){
         photo4: (row.photo4 || '').trim()
       }))
       .filter(s => !isNaN(s.lat) && !isNaN(s.lng));
+
+    if (!sites.length) {
+      statusEl.textContent = `Found ${parsed.data.length} row(s) but couldn't read coordinates — check that your sheet has "lat" and "lng" columns (exact spelling) with plain numbers in them.`;
+      return;
+    }
 
     buildMarkers(sites);
 
