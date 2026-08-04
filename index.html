@@ -15,6 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Wall Art">
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 
@@ -217,6 +218,23 @@
     color:var(--chalk-dim) !important;
   }
   .leaflet-control-attribution a{ color:var(--chalk-dim) !important; }
+
+  /* ---- Loading / status message ---- */
+  #status-msg{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    z-index:900;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 20px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--chalk-dim);
+    text-align:center;
+    max-width:260px;
+  }
 </style>
 </head>
 <body>
@@ -242,44 +260,26 @@
   <button class="r-close" onclick="clearRoute()">Clear route</button>
 </div>
 
+<div id="status-msg">Loading murals…</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 /* ============================================================
-   1. SITE DATA
+   1. SITE DATA SOURCE
    ------------------------------------------------------------
-   Replace this array with your real mural/graffiti data.
-   safety: "safe" | "day" | "unsafe"
+   Sites now live in a Google Sheet, not in this file.
+   Paste your published-to-web CSV link below.
+   Sheet columns (exact header names, any order): name, artist,
+   lat, lng, safety, photo, description
+   safety values: safe | day | unsafe
    photo: filename inside the /images folder (or a full URL)
    ============================================================ */
-const sites = [
-  {
-    id: 1,
-    name: "Unknown",
-    artist: "Unknown",
-    lat: 0.304399,
-    lng: 32.584907,
-    safety: "safe",
-    photo: "mural-1.jpg",
-    description: "Located at the Herman Padel Center entrance. Safe to visit day or night."
-  },
-  {
-    id: 2,
-    name: "Unknown",
-    artist: "Unknown",
-    lat: 0.342802,
-    lng: 32.638745,
-    safety: "unsafe",
-    photo: "mural-2.jpg",
-    description: "Located in Banda, on the fence of the Honda motor dealer, accessed through the neighboring slums. Not recommended to visit, day or night."
-  }
-];
+const SHEET_CSV_URL = "PASTE_YOUR_PUBLISHED_GOOGLE_SHEET_CSV_LINK_HERE";
 
 /* ============================================================
    2. MAP SETUP
    ============================================================ */
-const map = L.map('map', { zoomControl: false });
-const bounds = L.latLngBounds(sites.map(s => [s.lat, s.lng]));
-map.fitBounds(bounds, { padding: [80, 80] });
+const map = L.map('map', { zoomControl: false }).setView([0.3476, 32.5825], 12); // Kampala, default view until sites load
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -308,34 +308,84 @@ function iconFor(safety){
 }
 
 /* ============================================================
-   4. MARKERS + POPUPS
+   4. LOAD SITES FROM GOOGLE SHEET, THEN BUILD MARKERS + POPUPS
    ============================================================ */
 const markers = {};
+const statusEl = document.getElementById('status-msg');
 
-sites.forEach(site => {
-  const marker = L.marker([site.lat, site.lng], { icon: iconFor(site.safety) }).addTo(map);
+async function loadSites(){
+  if (SHEET_CSV_URL.includes('PASTE_YOUR')) {
+    statusEl.textContent = 'No sheet connected yet — see README to link your Google Sheet.';
+    return;
+  }
+  try {
+    const res = await fetch(SHEET_CSV_URL);
+    if (!res.ok) throw new Error('Sheet fetch failed: ' + res.status);
+    const csvText = await res.text();
 
-  const safetyLabel = site.safety === 'day' ? 'Safe during day time'
-                     : site.safety === 'unsafe' ? 'Unsafe'
-                     : 'Safe';
+    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
-  const popupHtml = `
-    <img class="popup-photo" src="images/${site.photo}" alt="${site.name}"
-         onerror="this.src='https://placehold.co/260x150/212228/A9A8AD?text=Add+photo';" />
-    <div class="popup-body">
-      <div class="popup-eyebrow ${site.safety}">${safetyLabel}</div>
-      <p class="popup-title">${site.name}</p>
-      <p class="popup-artist">Artist: <b>${site.artist}</b></p>
-      <p class="popup-desc">${site.description || ''}</p>
-      <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${site.name.replace(/'/g, "\\'")}')">
-        Get directions
-      </button>
-    </div>
-  `;
+    const sites = parsed.data
+      .map((row, i) => ({
+        id: i + 1,
+        name: (row.name || 'Unknown').trim(),
+        artist: (row.artist || 'Unknown').trim(),
+        lat: parseFloat(row.lat),
+        lng: parseFloat(row.lng),
+        safety: (row.safety || 'safe').trim().toLowerCase(),
+        photo: (row.photo || '').trim(),
+        description: (row.description || '').trim()
+      }))
+      .filter(s => !isNaN(s.lat) && !isNaN(s.lng));
 
-  marker.bindPopup(popupHtml);
-  markers[site.id] = marker;
-});
+    buildMarkers(sites);
+
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Could not load mural data. Check the sheet link and publish settings.';
+  }
+}
+
+function buildMarkers(sites){
+  if (!sites.length) {
+    statusEl.textContent = 'No sites yet — add a row to your Google Sheet.';
+    return;
+  }
+
+  sites.forEach(site => {
+    const marker = L.marker([site.lat, site.lng], { icon: iconFor(site.safety) }).addTo(map);
+
+    const safetyLabel = site.safety === 'day' ? 'Safe during day time'
+                       : site.safety === 'unsafe' ? 'Unsafe'
+                       : 'Safe';
+
+    const photoSrc = /^https?:\/\//i.test(site.photo) ? site.photo : `images/${site.photo}`;
+
+    const popupHtml = `
+      <img class="popup-photo" src="${photoSrc}" alt="${site.name}"
+           onerror="this.src='https://placehold.co/260x150/212228/A9A8AD?text=Add+photo';" />
+      <div class="popup-body">
+        <div class="popup-eyebrow ${site.safety}">${safetyLabel}</div>
+        <p class="popup-title">${site.name}</p>
+        <p class="popup-artist">Artist: <b>${site.artist}</b></p>
+        <p class="popup-desc">${site.description || ''}</p>
+        <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${site.name.replace(/'/g, "\\'")}')">
+          Get directions
+        </button>
+      </div>
+    `;
+
+    marker.bindPopup(popupHtml);
+    markers[site.id] = marker;
+  });
+
+  const bounds = L.latLngBounds(sites.map(s => [s.lat, s.lng]));
+  map.fitBounds(bounds, { padding: [80, 80] });
+
+  statusEl.style.display = 'none';
+}
+
+loadSites();
 
 /* ============================================================
    5. ROUTING (free — OSRM public demo server, no API key)
