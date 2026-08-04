@@ -21,13 +21,12 @@ Mural data now lives in a **Google Sheet**, not in the code. Once it's set up (o
 
 1. **Create the sheet.** In Google Sheets, make a new sheet with exactly these column headers in row 1 (any order, but spelled exactly like this):
 
-   | name | artist | lat | lng | safety | description | photo | year | photo2 | year2 | photo3 | year3 | photo4 | year4 |
-   |------|--------|-----|-----|--------|-------------|-------|------|--------|-------|--------|-------|--------|-------|
+   | name | artist | lat | lng | safety | description | photo | photo2 | photo3 | photo4 |
+   |------|--------|-----|-----|--------|-------------|-------|--------|--------|--------|
 
    - `safety` must be one of: `safe`, `day`, `unsafe`
    - `lat` / `lng`: right-click a spot in Google Maps, click the coordinates to copy
-   - `photo`, `photo2`, `photo3`, `photo4`: up to 4 photos per site — each a filename (e.g. `mural-3.jpg`) or a full image URL. Leave later ones blank if a site has fewer photos; the app only shows however many are filled in.
-   - `year`, `year2`, `year3`, `year4`: the year each matching photo was taken — shown as a white-on-black badge on the bottom-left of that photo. Leave blank to hide the badge for that photo.
+   - `photo`, `photo2`, `photo3`, `photo4`: up to 4 photos per site — each a filename or a full image URL. Leave later ones blank if a site has fewer photos.
 
    **Shortcut**: this project includes `starter-data.csv` with your existing two murals already filled in. In Google Sheets: **File → Import → Upload**, select that file, choose "Replace current sheet," and you're already set up with the right columns and both existing sites.
 
@@ -49,11 +48,17 @@ Mural data now lives in a **Google Sheet**, not in the code. Once it's set up (o
 > Google's published CSV can take a few minutes to reflect a fresh edit (it's cached briefly on their end) — if a new row doesn't show immediately, wait a minute and refresh again.
 
 ### Adding photos
-Photos still need to be reachable at a URL. Two options:
-- **Simplest**: drag the photo file into the `images/` folder in your GitHub repo (GitHub's website lets you drag-and-drop upload — no code, no terminal), then put that exact filename in the `photo` column.
-- **Alternative**: host the photo anywhere else (Google Photos shared link, etc.) and put the full `https://...` URL in the `photo` column instead.
+Photos still need to be reachable at a URL, and must be saved as **.jpg**, named with the year as the last part of the filename before the extension — the app reads that automatically for the year badge:
 
-If a photo is missing or the filename doesn't match, the popup shows a placeholder automatically instead of breaking.
+```
+Herman Padel Mural_2026.jpg
+```
+
+Two ways to host them:
+- **Simplest**: drag the photo file into the `images/` folder in your GitHub repo (GitHub's website lets you drag-and-drop upload — no code, no terminal), then put that exact filename in the `photo` column (`photo2`/`photo3`/`photo4` for additional photos of the same site).
+- **Alternative**: host the photo anywhere else (Google Photos shared link, etc.) and put the full `https://...` URL in the `photo` column instead — as long as the URL still ends in `..._YYYY.jpg`, the year badge still works.
+
+If a filename doesn't end in `_YYYY.jpg`, the photo still displays fine — it just won't show a year badge. If a photo is missing or the filename doesn't match what's in the sheet, the popup shows a placeholder automatically instead of breaking.
 
 ## Step A — Test locally
 Just double-click `index.html` to open it in a browser. Geolocation (for routing) may be blocked on `file://` in some browsers — if "Get directions" doesn't work locally, that's expected; it will work once hosted (Step B).
@@ -78,7 +83,7 @@ Once it's live on GitHub Pages (installing only works over `https://`, not from 
 No app store, no review process, no developer fee — this is what makes a PWA (Progressive Web App) the free path to something install-able. A "real" app-store app is a separate, bigger project (rebuilt in a mobile framework, plus a $25 one-time Google Play fee or $99/year Apple fee) — not needed unless you specifically want store listing/discovery later.
 
 ## Notes & options
-- **Photo gallery**: each site can show up to 4 photos. In the popup, swipe (or use the arrow buttons) to scroll through them; dots show which photo you're on. Each photo's year appears as a white-on-black badge, bottom-left.
+- **Photo gallery**: each site can show up to 4 photos. In the popup, swipe (or use the arrow buttons) to scroll through them; dots show which photo you're on. The year shown as a white-on-black badge (bottom-left) is read automatically from the filename — save photos as `.jpg` named like `Herman Padel Mural_2026.jpg` and the "2026" becomes the badge, no extra column needed.
 - **Routing**: "Drive + walk directions" is the default — it drives as far as a road reaches, then automatically switches to a walking leg (shown as a dashed teal line) if the site sits off-road, e.g. down a footpath or through an informal settlement. "Walking directions only" is also available as a second button for anyone who'd rather walk the whole way.
 - **Basemap**: Google Hybrid (satellite + labels), pulled from Google's public tile endpoint. This works without any sign-up or billing, but it's an unofficial method (not the sanctioned Maps JavaScript API), so Google could change or block it without warning. If that ever happens, a solid free fallback is Esri's World Imagery hybrid basemap through your ArcGIS Online account.
 - **Safety labels**: "Safe" (cyan, checkmark), "Safe during day time" (amber, sun), "Unsafe" (red, warning triangle) — shown as colored pin markers and in the legend top-right.

@@ -351,13 +351,18 @@
    Paste your published-to-web CSV link below.
    Sheet columns (exact header names, any order):
      name, artist, lat, lng, safety, description,
-     photo, year, photo2, year2, photo3, year3, photo4, year4
+     photo, photo2, photo3, photo4
    safety values: safe | day | unsafe
    photo/photo2/photo3/photo4: filenames in /images (or full URLs) —
    leave later ones blank if a site has fewer than 4 photos.
-   year/year2/year3/year4: the year each matching photo was taken.
+
+   PHOTO NAMING (required): save photos as .jpg, named so the year
+   is the last part before the extension, e.g.:
+     Herman Padel Mural_2026.jpg
+   The app reads the trailing "_YYYY" and shows it as the year
+   badge automatically — no separate year column needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://drive.google.com/file/d/1FLtmTABibDIEeG4cFjivV5SFXSQ3VUfs/view?usp=sharing";
+const SHEET_CSV_URL = "PASTE_YOUR_PUBLISHED_GOOGLE_SHEET_CSV_LINK_HERE";
 
 /* ============================================================
    2. MAP SETUP
@@ -397,15 +402,17 @@ function resolveSrc(p){
   return /^https?:\/\//i.test(p) ? p : `images/${p}`;
 }
 
+// Reads the year from a filename like "Herman Padel Mural_2026.jpg"
+function extractYear(pathOrUrl){
+  const filename = pathOrUrl.split('/').pop();
+  const match = filename.match(/_([12]\d{3})\.jpe?g$/i);
+  return match ? match[1] : '';
+}
+
 function imagesFor(site){
-  return [
-    [site.photo, site.year],
-    [site.photo2, site.year2],
-    [site.photo3, site.year3],
-    [site.photo4, site.year4]
-  ]
-  .filter(([p]) => p)
-  .map(([p, y]) => ({ src: resolveSrc(p), year: y }));
+  return [site.photo, site.photo2, site.photo3, site.photo4]
+    .filter(p => p)
+    .map(p => ({ src: resolveSrc(p), year: extractYear(p) }));
 }
 
 function galleryHtml(images, siteName){
@@ -481,13 +488,9 @@ async function loadSites(){
         safety: (row.safety || 'safe').trim().toLowerCase(),
         description: (row.description || '').trim(),
         photo: (row.photo || '').trim(),
-        year: (row.year || '').trim(),
         photo2: (row.photo2 || '').trim(),
-        year2: (row.year2 || '').trim(),
         photo3: (row.photo3 || '').trim(),
-        year3: (row.year3 || '').trim(),
-        photo4: (row.photo4 || '').trim(),
-        year4: (row.year4 || '').trim()
+        photo4: (row.photo4 || '').trim()
       }))
       .filter(s => !isNaN(s.lat) && !isNaN(s.lng));
 
