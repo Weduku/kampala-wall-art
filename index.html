@@ -371,15 +371,38 @@ const map = L.map('map', { zoomControl: false }).setView([0.3476, 32.5825], 12);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Google Hybrid basemap (satellite imagery + road/place labels)
+// Google basemap — labels only appear once zoomed in close, to keep the
+// map uncluttered at wider views. Below the threshold: satellite only, no
+// labels. At/above it: hybrid (satellite + place/road labels).
 // Note: this uses Google's public tile endpoint directly rather than the official,
 // key-based Maps JavaScript API — it's the only no-signup, no-billing way to pull
-// Google's hybrid tiles, but it's unofficial and could change without notice.
-L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+// Google's tiles, but it's unofficial and could change without notice.
+const LABEL_ZOOM_THRESHOLD = 17; // roughly a ~150–300m-wide view, adjust up/down to taste
+
+const satOnlyLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
   attribution: 'Map data &copy; Google',
   subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
   maxZoom: 20
-}).addTo(map);
+});
+
+const hybridLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+  attribution: 'Map data &copy; Google',
+  subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  maxZoom: 20
+});
+
+function updateBaseLayer(){
+  if (map.getZoom() >= LABEL_ZOOM_THRESHOLD) {
+    if (!map.hasLayer(hybridLayer)) hybridLayer.addTo(map);
+    if (map.hasLayer(satOnlyLayer)) map.removeLayer(satOnlyLayer);
+  } else {
+    if (!map.hasLayer(satOnlyLayer)) satOnlyLayer.addTo(map);
+    if (map.hasLayer(hybridLayer)) map.removeLayer(hybridLayer);
+  }
+}
+
+updateBaseLayer();
+map.on('zoomend', updateBaseLayer);
 
 /* ============================================================
    3. CUSTOM ICONS
