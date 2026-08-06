@@ -244,22 +244,6 @@
   .btn-route:hover{ opacity:0.85; }
   .btn-route:active{ transform:scale(0.97); }
 
-  .btn-route-secondary{
-    width:100%;
-    border:1px solid var(--line);
-    border-radius:8px;
-    padding:9px 12px;
-    font-family:'Inter',sans-serif;
-    font-weight:500;
-    font-size:12px;
-    cursor:pointer;
-    background:transparent;
-    color:var(--chalk-dim);
-    margin-top:6px;
-    transition:opacity 0.12s ease;
-  }
-  .btn-route-secondary:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
-
   /* ---- Route info panel ---- */
   #route-panel{
     position:absolute;
@@ -274,12 +258,32 @@
     box-shadow:0 8px 24px rgba(0,0,0,0.35);
   }
   #route-panel.show{ display:block; }
+  .route-panel-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:6px;
+  }
   #route-panel .r-title{
     font-family:'Archivo Black', sans-serif;
     font-size:13px;
     text-transform:uppercase;
-    margin:0 0 6px;
+    margin:0;
   }
+  .route-mode-toggle{
+    flex-shrink:0;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--chalk-dim);
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    padding:4px 8px;
+    border-radius:6px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .route-mode-toggle:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
   #route-panel .r-stats{
     font-family:'JetBrains Mono', monospace;
     font-size:12px;
@@ -553,7 +557,10 @@
 </div>
 
 <div id="route-panel">
-  <div class="r-title" id="r-title">Route</div>
+  <div class="route-panel-top">
+    <div class="r-title" id="r-title">Route</div>
+    <button id="route-mode-toggle" class="route-mode-toggle" onclick="toggleRouteMode()">Walk all the way</button>
+  </div>
   <div class="r-stats" id="r-stats"></div>
   <button class="r-close" onclick="clearRoute()">Clear route</button>
 </div>
@@ -860,11 +867,8 @@ function buildMarkers(sites){
         <p class="popup-title">${site.name}</p>
         <p class="popup-artist">Artist: <b>${site.artist}</b></p>
         <p class="popup-desc">${site.description || ''}</p>
-        <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${escapedName}', 'hybrid')">
-          Drive + walk directions
-        </button>
-        <button class="btn-route-secondary" onclick="routeTo(${site.lat}, ${site.lng}, '${escapedName}', 'walk')">
-          Walking directions only
+        <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${escapedName}')">
+          Get directions
         </button>
       </div>
     `;
@@ -885,12 +889,14 @@ loadSites();
 /* ============================================================
    5. ROUTING (free — OSRM public demo server, no API key)
    ------------------------------------------------------------
-   mode "hybrid": drive as far as a road reaches, then walk the
+   Automatic mode: drive as far as a road reaches, then walk the
    rest of the way if the site sits off-road (footpaths, slums, etc).
-   mode "walk": walking directions the whole way.
+   A corner toggle on the route panel switches to walking the whole way.
    ============================================================ */
 let routeLayer = null;
 let userMarker = null;
+let currentRouteContext = null; // {userLat, userLng, destLat, destLng, destName}
+let currentRouteMode = 'hybrid';
 
 function haversineMeters(lat1, lng1, lat2, lng2){
   const R = 6371000;
@@ -909,7 +915,7 @@ async function fetchOsrmRoute(profile, fromLat, fromLng, toLat, toLng){
   return { route: data.routes[0], waypoints: data.waypoints };
 }
 
-function routeTo(destLat, destLng, destName, mode){
+function routeTo(destLat, destLng, destName){
   if (!navigator.onLine) {
     alert("Directions need an internet connection. You can still browse murals and their photos offline.");
     return;
@@ -931,14 +937,36 @@ function routeTo(destLat, destLng, destName, mode){
       radius: 7, color: '#31D8C9', fillColor: '#31D8C9', fillOpacity: 1, weight: 2
     }).addTo(map).bindPopup('You are here');
 
-    if (mode === 'walk') {
-      await drawWalkingRoute(userLat, userLng, destLat, destLng, destName);
-    } else {
-      await drawHybridRoute(userLat, userLng, destLat, destLng, destName);
-    }
+    currentRouteContext = { userLat, userLng, destLat, destLng, destName };
+    currentRouteMode = 'hybrid';
+    updateRouteModeToggleLabel();
+
+    await drawHybridRoute(userLat, userLng, destLat, destLng, destName);
   }, () => {
     alert('Could not get your location. Please allow location access and try again.');
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// Corner toggle in the route panel — switches between the automatic
+// drive+walk route and a walking-only route for the same trip
+function toggleRouteMode(){
+  if (!currentRouteContext) return;
+  const { userLat, userLng, destLat, destLng, destName } = currentRouteContext;
+
+  if (currentRouteMode === 'hybrid') {
+    currentRouteMode = 'walk';
+    drawWalkingRoute(userLat, userLng, destLat, destLng, destName);
+  } else {
+    currentRouteMode = 'hybrid';
+    drawHybridRoute(userLat, userLng, destLat, destLng, destName);
+  }
+  updateRouteModeToggleLabel();
+}
+
+function updateRouteModeToggleLabel(){
+  const btn = document.getElementById('route-mode-toggle');
+  if (!btn) return;
+  btn.textContent = currentRouteMode === 'hybrid' ? 'Walk all the way' : 'Drive + walk instead';
 }
 
 async function drawWalkingRoute(userLat, userLng, destLat, destLng, destName){
@@ -1002,6 +1030,9 @@ async function drawHybridRoute(userLat, userLng, destLat, destLng, destName){
 function clearRoute(){
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
   if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+  currentRouteContext = null;
+  currentRouteMode = 'hybrid';
+  updateRouteModeToggleLabel();
   document.getElementById('route-panel').classList.remove('show');
 }
 
