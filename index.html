@@ -581,18 +581,19 @@
    Paste your published-to-web CSV link below.
    Sheet columns (exact header names, any order):
      name, artist, lat, lng, safety, description,
-     photo, photo2, photo3, photo4
+     photo, year, photo2, year2, photo3, year3, photo4, year4
    safety values: safe | day | unsafe
    photo/photo2/photo3/photo4: filenames in /images (or full URLs) —
    leave later ones blank if a site has fewer than 4 photos.
+   year/year2/year3/year4: the year each matching photo was taken —
+   a plain value in the sheet, not derived from the filename.
 
-   PHOTO NAMING (required): save photos as .jpg, named so the year
-   is the last part before the extension, e.g.:
-     Herman Padel Mural_2026.jpg
-   The app reads the trailing "_YYYY" and shows it as the year
-   badge automatically — no separate year column needed.
+   Backward compatibility: if a year cell is left blank, the app
+   falls back to reading a trailing "_YYYY" from that photo's
+   filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
+   named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 /* ============================================================
    2. MAP SETUP
@@ -655,7 +656,8 @@ function resolveSrc(p){
   return /^https?:\/\//i.test(p) ? p : `images/${p}`;
 }
 
-// Reads the year from a filename like "Herman Padel Mural_2026.jpg"
+// Fallback only: reads the year from a filename like "Herman Padel Mural_2026.jpg",
+// used when a sheet row has no explicit year value for that photo
 function extractYear(pathOrUrl){
   const filename = pathOrUrl.split('/').pop();
   const match = filename.match(/_([12]\d{3})\.jpe?g$/i);
@@ -663,9 +665,14 @@ function extractYear(pathOrUrl){
 }
 
 function imagesFor(site){
-  return [site.photo, site.photo2, site.photo3, site.photo4]
-    .filter(p => p)
-    .map(p => ({ src: resolveSrc(p), year: extractYear(p) }));
+  return [
+    [site.photo, site.year],
+    [site.photo2, site.year2],
+    [site.photo3, site.year3],
+    [site.photo4, site.year4]
+  ]
+  .filter(([p]) => p)
+  .map(([p, y]) => ({ src: resolveSrc(p), year: (y || extractYear(p)) }));
 }
 
 function galleryHtml(images, siteName, siteId){
@@ -822,9 +829,13 @@ async function loadSites(){
         safety: (row.safety || 'safe').trim().toLowerCase(),
         description: (row.description || '').trim(),
         photo: (row.photo || '').trim(),
+        year: (row.year || '').trim(),
         photo2: (row.photo2 || '').trim(),
+        year2: (row.year2 || '').trim(),
         photo3: (row.photo3 || '').trim(),
-        photo4: (row.photo4 || '').trim()
+        year3: (row.year3 || '').trim(),
+        photo4: (row.photo4 || '').trim(),
+        year4: (row.year4 || '').trim()
       }))
       .filter(s => !isNaN(s.lat) && !isNaN(s.lng));
 

@@ -21,14 +21,15 @@ Mural data now lives in a **Google Sheet**, not in the code. Once it's set up (o
 
 1. **Create the sheet.** In Google Sheets, make a new sheet with exactly these column headers in row 1 (any order, but spelled exactly like this):
 
-   | name | artist | lat | lng | safety | description | photo | photo2 | photo3 | photo4 |
-   |------|--------|-----|-----|--------|-------------|-------|--------|--------|--------|
+   | name | artist | lat | lng | safety | description | photo | year | photo2 | year2 | photo3 | year3 | photo4 | year4 |
+   |------|--------|-----|-----|--------|-------------|-------|------|--------|-------|--------|-------|--------|-------|
 
    - `safety` must be one of: `safe`, `day`, `unsafe`
    - `lat` / `lng`: right-click a spot in Google Maps, click the coordinates to copy
    - `photo`, `photo2`, `photo3`, `photo4`: up to 4 photos per site — each a filename or a full image URL. Leave later ones blank if a site has fewer photos.
+   - `year`, `year2`, `year3`, `year4`: the year each matching photo was taken — shown as a white-on-black badge on that photo. Just type it in as a plain value (no special filename needed).
 
-   **Shortcut**: this project includes `starter-data.csv` with your existing two murals already filled in. In Google Sheets: **File → Import → Upload**, select that file, choose "Replace current sheet," and you're already set up with the right columns and both existing sites.
+   **Shortcut**: this project includes `starter-data.csv` with your existing 5 murals already filled in. In Google Sheets: **File → Import → Upload**, select that file, choose "Replace current sheet," and you're already set up with the right columns.
 
 2. **Publish it as CSV.** In Google Sheets: **File → Share → Publish to web**. Under "Link," choose the specific sheet/tab, and under the format dropdown choose **Comma-separated values (.csv)**. Click **Publish**. Copy the link it gives you.
 
@@ -48,17 +49,14 @@ Mural data now lives in a **Google Sheet**, not in the code. Once it's set up (o
 > Google's published CSV can take a few minutes to reflect a fresh edit (it's cached briefly on their end) — if a new row doesn't show immediately, wait a minute and refresh again.
 
 ### Adding photos
-Photos still need to be reachable at a URL, and must be saved as **.jpg**, named with the year as the last part of the filename before the extension — the app reads that automatically for the year badge:
-
-```
-Herman Padel Mural_2026.jpg
-```
+Photos need to be reachable at a URL, and the matching `year` column just needs a plain value like `2026` — no special filename format required.
 
 Two ways to host them:
-- **Simplest**: drag the photo file into the `images/` folder in your GitHub repo (GitHub's website lets you drag-and-drop upload — no code, no terminal), then put that exact filename in the `photo` column (`photo2`/`photo3`/`photo4` for additional photos of the same site).
-- **Alternative**: host the photo anywhere else (Google Photos shared link, etc.) and put the full `https://...` URL in the `photo` column instead — as long as the URL still ends in `..._YYYY.jpg`, the year badge still works.
+- **Simplest**: drag the photo file into the `images/` folder in your GitHub repo (GitHub's website lets you drag-and-drop upload — no code, no terminal), then put that exact filename in the `photo` column (`photo2`/`photo3`/`photo4` for additional photos of the same site), and the year in the matching `year` column.
+- **Alternative**: host the photo anywhere else (Google Photos shared link, etc.) and put the full `https://...` URL in the `photo` column instead.
+- **Via Kobo**: if you're using the Kobo → GitHub automation, this all happens automatically — see `kobo-to-github-sync.gs` and `SETUP-GUIDE.md`.
 
-If a filename doesn't end in `_YYYY.jpg`, the photo still displays fine — it just won't show a year badge. If a photo is missing or the filename doesn't match what's in the sheet, the popup shows a placeholder automatically instead of breaking.
+Old photos still named the original way (e.g. `Herman Padel Mural_2026.jpg`) keep working even with the `year` cell left blank — the app falls back to reading the year from that filename pattern automatically. If a photo is missing or the filename doesn't match what's in the sheet, the popup shows a placeholder automatically instead of breaking.
 
 ## Step A — Test locally
 Just double-click `index.html` to open it in a browser. Geolocation (for routing) may be blocked on `file://` in some browsers — if "Get directions" doesn't work locally, that's expected; it will work once hosted (Step B).
