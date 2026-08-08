@@ -45,6 +45,118 @@
     position:absolute;
     inset:0;
   }
+  #map-rotate-wrapper{
+    position:absolute;
+    inset:0;
+    transform-origin:50% 50%;
+    transition:transform 0.25s ease-out;
+    will-change:transform;
+  }
+
+  #compass-toggle{
+    position:absolute;
+    bottom:88px; right:10px;
+    z-index:1000;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--ink-2);
+    color:var(--chalk-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    transition:color 0.15s ease, border-color 0.15s ease;
+  }
+  #compass-toggle:hover{ color:var(--chalk); }
+  #compass-toggle.active{
+    border-color:var(--cyan);
+    color:var(--cyan);
+  }
+  #compass-needle{
+    font-size:16px;
+    line-height:1;
+    transition:transform 0.25s ease-out;
+  }
+
+  #feedback-toggle{
+    position:absolute;
+    bottom:138px; right:10px;
+    z-index:1000;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--ink-2);
+    color:var(--chalk-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    font-size:16px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    transition:color 0.15s ease;
+  }
+  #feedback-toggle:hover{ color:var(--chalk); }
+
+  #feedback-modal{
+    position:fixed;
+    inset:0;
+    z-index:2100;
+    background:rgba(10,10,12,0.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+  }
+  #feedback-modal.show{ display:flex; }
+  .feedback-box{
+    width:300px;
+    max-width:88vw;
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+  }
+  .feedback-box h3{
+    font-family:'Archivo Black', sans-serif;
+    font-size:14px;
+    text-transform:uppercase;
+    margin:0 0 12px;
+  }
+  .feedback-box textarea{
+    width:100%;
+    min-height:100px;
+    background:var(--ink);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--chalk);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    padding:10px;
+    resize:vertical;
+    box-sizing:border-box;
+  }
+  .feedback-box textarea:focus{ outline:1px solid var(--cyan); }
+  #feedback-status{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--chalk-dim);
+    min-height:16px;
+    margin:8px 0;
+  }
+  .feedback-actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+  }
+  .feedback-actions .btn-route{ width:auto; padding:9px 16px; }
+  .feedback-cancel{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--chalk-dim);
+    border-radius:8px;
+    padding:9px 14px;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .feedback-cancel:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
 
   /* ---- Top bar ---- */
   header{
@@ -541,7 +653,27 @@
 
 <div id="offline-banner">You're offline — showing saved murals. Directions need a connection.</div>
 
-<div id="map"></div>
+<div id="map-rotate-wrapper">
+  <div id="map"></div>
+</div>
+
+<button id="compass-toggle" onclick="toggleHeadingMode()">
+  <div id="compass-needle">▲</div>
+</button>
+
+<button id="feedback-toggle" onclick="openFeedbackModal()">✎</button>
+
+<div id="feedback-modal">
+  <div class="feedback-box">
+    <h3>Send feedback</h3>
+    <textarea id="feedback-text" placeholder="Tell us what you think, report an issue, or suggest a mural..."></textarea>
+    <div id="feedback-status"></div>
+    <div class="feedback-actions">
+      <button class="feedback-cancel" onclick="closeFeedbackModal()">Cancel</button>
+      <button class="btn-route" onclick="sendFeedback()">Send</button>
+    </div>
+  </div>
+</div>
 
 <header>
   <div>
@@ -593,7 +725,7 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 /* ============================================================
    2. MAP SETUP
@@ -1064,6 +1196,173 @@ function updateOfflineBanner(){
 window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 updateOfflineBanner();
+
+/* ============================================================
+   8. FEEDBACK
+   ------------------------------------------------------------
+   Submits straight to a Google Form — no email address anywhere
+   in this file. Responses land privately in that form's linked
+   Google Sheet, visible only to whoever owns the form.
+   ============================================================ */
+const FEEDBACK_FORM_ID = '1FAIpQLSeblX5L55zyoIrLS4wgL81G_tyjThf7dGRCkW5U_AX2OXtqMw';
+const FEEDBACK_ENTRY_ID = 'entry.838261457';
+
+function openFeedbackModal(){
+  document.getElementById('feedback-status').textContent = '';
+  document.getElementById('feedback-modal').classList.add('show');
+}
+
+function closeFeedbackModal(){
+  document.getElementById('feedback-modal').classList.remove('show');
+  document.getElementById('feedback-text').value = '';
+}
+
+async function sendFeedback(){
+  const textEl = document.getElementById('feedback-text');
+  const statusEl = document.getElementById('feedback-status');
+  const text = textEl.value.trim();
+
+  if (!text) {
+    statusEl.textContent = 'Type something first.';
+    return;
+  }
+  if (!navigator.onLine) {
+    statusEl.textContent = "You're offline — feedback needs a connection to send.";
+    return;
+  }
+
+  statusEl.textContent = 'Sending…';
+
+  const url = `https://docs.google.com/forms/d/e/${FEEDBACK_FORM_ID}/formResponse`;
+  const body = new URLSearchParams();
+  body.append(FEEDBACK_ENTRY_ID, text);
+
+  try {
+    // no-cors: Google Forms doesn't send CORS headers, so the response
+    // can't be read — this just fires the submission and moves on
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    statusEl.textContent = 'Thanks! Feedback sent.';
+    setTimeout(closeFeedbackModal, 1200);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Could not send right now — check your connection and try again.';
+  }
+}
+
+document.getElementById('feedback-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'feedback-modal') closeFeedbackModal();
+});
+
+/* ============================================================
+   7. COMPASS / HEADING-FOLLOW MODE
+   ------------------------------------------------------------
+   Optional, off by default. Rotates the map to match the
+   direction the phone is facing, like turn-by-turn nav apps.
+   Depends on the device's compass sensor — quality varies by
+   phone and can be jittery near tall buildings. Only works on
+   mobile browsers over HTTPS; there's no equivalent on desktop.
+   ============================================================ */
+const mapWrapper = document.getElementById('map-rotate-wrapper');
+const compassToggleBtn = document.getElementById('compass-toggle');
+const compassNeedle = document.getElementById('compass-needle');
+
+let headingActive = false;
+let smoothedHeading = null;
+
+function toggleHeadingMode(){
+  if (headingActive) {
+    stopHeadingMode();
+    return;
+  }
+
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ requires an explicit permission prompt triggered by this tap
+    DeviceOrientationEvent.requestPermission().then((state) => {
+      if (state === 'granted') startHeadingMode();
+      else alert("Compass permission was denied, so heading mode can't work. You can still use the map normally.");
+    }).catch(() => {
+      alert('Could not request compass access on this device.');
+    });
+  } else if (window.DeviceOrientationEvent) {
+    startHeadingMode();
+  } else {
+    alert("This device or browser doesn't support compass heading. Heading mode needs a phone browser with motion sensors.");
+  }
+}
+
+function startHeadingMode(){
+  headingActive = true;
+  smoothedHeading = null;
+  compassToggleBtn.classList.add('active');
+  map.closePopup(); // avoid a rotated-looking popup right as rotation starts
+  window.addEventListener('deviceorientationabsolute', handleOrientation);
+  window.addEventListener('deviceorientation', handleOrientation);
+}
+
+function stopHeadingMode(){
+  headingActive = false;
+  compassToggleBtn.classList.remove('active');
+  window.removeEventListener('deviceorientationabsolute', handleOrientation);
+  window.removeEventListener('deviceorientation', handleOrientation);
+  mapWrapper.style.transform = 'rotate(0deg)';
+  compassNeedle.style.transform = 'rotate(0deg)';
+  document.querySelectorAll('.mural-pin .icon-inner').forEach((el) => {
+    el.style.transform = 'rotate(45deg)'; // back to the pin's default counter-rotation
+  });
+  const zoomControlEl = document.querySelector('.leaflet-control-zoom');
+  if (zoomControlEl) zoomControlEl.style.transform = 'rotate(0deg)';
+}
+
+function handleOrientation(e){
+  let heading;
+  if (typeof e.webkitCompassHeading === 'number') {
+    heading = e.webkitCompassHeading; // iOS — already a true compass heading
+  } else if (e.absolute && e.alpha !== null) {
+    heading = 360 - e.alpha; // Android absolute orientation, approximate
+  } else {
+    return; // no usable heading from this event
+  }
+
+  // Light smoothing so small sensor jitter doesn't make the map flicker
+  if (smoothedHeading === null) {
+    smoothedHeading = heading;
+  } else {
+    let diff = heading - smoothedHeading;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    smoothedHeading += diff * 0.15;
+  }
+
+  applyHeadingRotation(smoothedHeading);
+}
+
+function applyHeadingRotation(heading){
+  mapWrapper.style.transform = `rotate(${-heading}deg)`;
+  compassNeedle.style.transform = `rotate(${heading}deg)`;
+
+  // Keep pin symbols upright despite the map rotating underneath them
+  document.querySelectorAll('.mural-pin .icon-inner').forEach((el) => {
+    el.style.transform = `rotate(${45 + heading}deg)`;
+  });
+
+  // Keep the zoom +/- buttons upright and easy to tap
+  const zoomControlEl = document.querySelector('.leaflet-control-zoom');
+  if (zoomControlEl) {
+    zoomControlEl.style.transform = `rotate(${heading}deg)`;
+  }
+
+  // Keep any open popup readable rather than rotated sideways
+  const openPopupEl = document.querySelector('.leaflet-popup-content-wrapper');
+  if (openPopupEl) {
+    openPopupEl.style.transform = `rotate(${heading}deg)`;
+  }
+}
+
 </script>
 </body>
 </html>
