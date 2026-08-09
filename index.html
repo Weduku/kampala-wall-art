@@ -55,7 +55,7 @@
 
   #compass-toggle{
     position:absolute;
-    bottom:88px; right:10px;
+    top:78px; left:14px;
     z-index:1000;
     width:40px; height:40px;
     border-radius:50%;
@@ -72,6 +72,14 @@
     border-color:var(--cyan);
     color:var(--cyan);
   }
+  #compass-toggle.locked{
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+  #compass-toggle.needs-enable{
+    border-color:var(--magenta);
+    color:var(--magenta);
+  }
   #compass-needle{
     font-size:16px;
     line-height:1;
@@ -80,7 +88,7 @@
 
   #feedback-toggle{
     position:absolute;
-    bottom:138px; right:10px;
+    top:128px; left:14px;
     z-index:1000;
     width:40px; height:40px;
     border-radius:50%;
@@ -725,7 +733,7 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 /* ============================================================
    2. MAP SETUP
@@ -1261,64 +1269,90 @@ document.getElementById('feedback-modal').addEventListener('click', (e) => {
 /* ============================================================
    7. COMPASS / HEADING-FOLLOW MODE
    ------------------------------------------------------------
-   Optional, off by default. Rotates the map to match the
-   direction the phone is facing, like turn-by-turn nav apps.
-   Depends on the device's compass sensor — quality varies by
-   phone and can be jittery near tall buildings. Only works on
-   mobile browsers over HTTPS; there's no equivalent on desktop.
+   The map follows the direction the phone is facing by default,
+   like turn-by-turn nav apps. The button's job is to snap back to
+   standard north-up orientation on demand, then resume following
+   if tapped again. Depends on the device's compass sensor — quality
+   varies by phone and can be jittery near tall buildings. Only
+   works on mobile browsers over HTTPS; no equivalent on desktop.
+
+   iOS requires an explicit one-tap permission prompt before any
+   compass access works at all — that one tap can't be skipped or
+   automated, it's a browser security requirement. Until that first
+   tap, the button shows an "enable compass" state.
    ============================================================ */
 const mapWrapper = document.getElementById('map-rotate-wrapper');
 const compassToggleBtn = document.getElementById('compass-toggle');
 const compassNeedle = document.getElementById('compass-needle');
 
-let headingActive = false;
+let headingMode = 'off'; // 'off' | 'following' | 'locked-north'
 let smoothedHeading = null;
+let lastAppliedHeading = 0;
 
-function toggleHeadingMode(){
-  if (headingActive) {
-    stopHeadingMode();
-    return;
-  }
+function initCompass(){
+  const needsPermission = typeof DeviceOrientationEvent !== 'undefined'
+    && typeof DeviceOrientationEvent.requestPermission === 'function';
 
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // iOS 13+ requires an explicit permission prompt triggered by this tap
-    DeviceOrientationEvent.requestPermission().then((state) => {
-      if (state === 'granted') startHeadingMode();
-      else alert("Compass permission was denied, so heading mode can't work. You can still use the map normally.");
-    }).catch(() => {
-      alert('Could not request compass access on this device.');
-    });
+  if (needsPermission) {
+    // iOS — can't auto-start without a user tap; show the enable state
+    compassToggleBtn.classList.add('needs-enable');
   } else if (window.DeviceOrientationEvent) {
-    startHeadingMode();
+    // Android/other — no permission prompt needed, follow by default
+    startFollowing();
   } else {
-    alert("This device or browser doesn't support compass heading. Heading mode needs a phone browser with motion sensors.");
+    compassToggleBtn.style.display = 'none'; // no compass sensor available at all
   }
 }
 
-function startHeadingMode(){
-  headingActive = true;
+function toggleHeadingMode(){
+  if (headingMode === 'off') {
+    requestCompassAccess();
+  } else if (headingMode === 'following') {
+    lockToNorth();
+  } else {
+    startFollowing();
+  }
+}
+
+function requestCompassAccess(){
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then((state) => {
+      if (state === 'granted') {
+        compassToggleBtn.classList.remove('needs-enable');
+        startFollowing();
+      } else {
+        alert("Compass permission was denied, so heading mode can't work. You can still use the map normally.");
+      }
+    }).catch(() => {
+      alert('Could not request compass access on this device.');
+    });
+  } else {
+    startFollowing();
+  }
+}
+
+function startFollowing(){
+  headingMode = 'following';
   smoothedHeading = null;
+  compassToggleBtn.classList.remove('locked');
   compassToggleBtn.classList.add('active');
-  map.closePopup(); // avoid a rotated-looking popup right as rotation starts
+  compassNeedle.textContent = '▲';
   window.addEventListener('deviceorientationabsolute', handleOrientation);
   window.addEventListener('deviceorientation', handleOrientation);
 }
 
-function stopHeadingMode(){
-  headingActive = false;
+function lockToNorth(){
+  headingMode = 'locked-north';
   compassToggleBtn.classList.remove('active');
-  window.removeEventListener('deviceorientationabsolute', handleOrientation);
-  window.removeEventListener('deviceorientation', handleOrientation);
-  mapWrapper.style.transform = 'rotate(0deg)';
-  compassNeedle.style.transform = 'rotate(0deg)';
-  document.querySelectorAll('.mural-pin .icon-inner').forEach((el) => {
-    el.style.transform = 'rotate(45deg)'; // back to the pin's default counter-rotation
-  });
-  const zoomControlEl = document.querySelector('.leaflet-control-zoom');
-  if (zoomControlEl) zoomControlEl.style.transform = 'rotate(0deg)';
+  compassToggleBtn.classList.add('locked');
+  compassNeedle.textContent = 'N';
+  map.closePopup(); // avoid a rotated-looking popup mid-transition
+  applyHeadingRotation(0);
 }
 
 function handleOrientation(e){
+  if (headingMode !== 'following') return; // still listening while locked, just not applying rotation
+
   let heading;
   if (typeof e.webkitCompassHeading === 'number') {
     heading = e.webkitCompassHeading; // iOS — already a true compass heading
@@ -1342,6 +1376,7 @@ function handleOrientation(e){
 }
 
 function applyHeadingRotation(heading){
+  lastAppliedHeading = heading;
   mapWrapper.style.transform = `rotate(${-heading}deg)`;
   compassNeedle.style.transform = `rotate(${heading}deg)`;
 
@@ -1363,6 +1398,7 @@ function applyHeadingRotation(heading){
   }
 }
 
+initCompass();
 </script>
 </body>
 </html>
