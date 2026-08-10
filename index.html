@@ -758,7 +758,7 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 /* ============================================================
    2. MAP SETUP
@@ -1357,6 +1357,14 @@ function startFollowing(userInitiated){
   compassToggleBtn.classList.add('active');
   compassNeedle.textContent = '▲';
 
+  // Leaflet has no idea the map is visually rotated (that's done purely
+  // with a CSS transform on top of it) — so its drag handling still tracks
+  // raw, unrotated screen movement. At non-zero rotation angles this makes
+  // manual dragging feel wrong or inverted, worst right around 180°. Since
+  // the map is auto-centering on your GPS position in this mode anyway,
+  // manual dragging is disabled here rather than left broken/confusing.
+  map.dragging.disable();
+
   // Primary: GPS direction of travel — stable, and matches how Google Maps
   // walking navigation works. Only updates while actually moving.
   if (geoWatchId === null) {
@@ -1403,6 +1411,7 @@ function lockToNorth(){
   compassToggleBtn.classList.add('locked');
   compassNeedle.textContent = 'N';
   map.closePopup(); // avoid a rotated-looking popup mid-transition
+  map.dragging.enable(); // rotation is back to 0° here, so normal dragging works correctly again
   applyHeadingRotation(0);
 }
 
