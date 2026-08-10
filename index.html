@@ -733,7 +733,7 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 /* ============================================================
    2. MAP SETUP
@@ -794,6 +794,18 @@ function iconFor(safety){
    ============================================================ */
 function resolveSrc(p){
   return /^https?:\/\//i.test(p) ? p : `images/${p}`;
+}
+
+// Normalizes whatever the sheet contains ("safe", "unsafe", "safe during
+// day time", or messier variants like "safe_during_day_time") into the
+// short internal code used for CSS classes and icons: 'safe' | 'day' | 'unsafe'.
+// Checks 'unsafe' before 'safe' since 'unsafe' contains 'safe' as a substring.
+function normalizeSafetyCode(raw){
+  const v = (raw || '').toLowerCase().replace(/_/g, ' ').trim();
+  if (v.includes('unsafe')) return 'unsafe';
+  if (v.includes('day')) return 'day';
+  if (v.includes('safe')) return 'safe';
+  return 'safe';
 }
 
 // Fallback only: reads the year from a filename like "Herman Padel Mural_2026.jpg",
@@ -966,7 +978,7 @@ async function loadSites(){
         artist: (row.artist || 'Unknown').trim(),
         lat: toNum(row.lat),
         lng: toNum(row.lng),
-        safety: (row.safety || 'safe').trim().toLowerCase(),
+        safety: normalizeSafetyCode(row.safety),
         description: (row.description || '').trim(),
         photo: (row.photo || '').trim(),
         year: (row.year || '').trim(),
