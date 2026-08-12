@@ -123,6 +123,23 @@
   }
   #feedback-toggle:hover{ color:var(--chalk); }
 
+  #route-planner-toggle{
+    position:absolute;
+    top:178px; left:14px;
+    z-index:1000;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--ink-2);
+    color:var(--chalk-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    font-size:16px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    transition:color 0.15s ease;
+  }
+  #route-planner-toggle:hover{ color:var(--chalk); }
+
   #feedback-modal{
     position:fixed;
     inset:0;
@@ -133,6 +150,16 @@
     justify-content:center;
   }
   #feedback-modal.show{ display:flex; }
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    z-index:2100;
+    background:rgba(10,10,12,0.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+  }
+  .modal-overlay.show{ display:flex; }
   .feedback-box{
     width:300px;
     max-width:88vw;
@@ -185,6 +212,46 @@
     cursor:pointer;
   }
   .feedback-cancel:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
+
+  .feedback-box input[type="file"],
+  .feedback-box input[type="number"],
+  .feedback-box input[type="text"]{
+    width:100%;
+    background:var(--ink);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--chalk);
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    padding:10px;
+    box-sizing:border-box;
+    margin-bottom:10px;
+  }
+  .feedback-box label{
+    display:block;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--chalk-dim);
+    margin-bottom:6px;
+  }
+  .site-picker-list{
+    max-height:260px;
+    overflow-y:auto;
+    border:1px solid var(--line);
+    border-radius:8px;
+    margin-bottom:12px;
+  }
+  .site-picker-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .site-picker-item:last-child{ border-bottom:none; }
+  .site-picker-item input{ flex-shrink:0; width:16px; height:16px; }
+  .site-picker-item label{ margin:0; color:var(--chalk); font-family:'Inter', sans-serif; font-size:13px; }
 
   /* ---- Top bar ---- */
   header{
@@ -383,6 +450,22 @@
   }
   .btn-route:hover{ opacity:0.85; }
   .btn-route:active{ transform:scale(0.97); }
+
+  .btn-route-secondary{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:9px 12px;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+    font-size:12px;
+    cursor:pointer;
+    background:transparent;
+    color:var(--chalk-dim);
+    margin-top:6px;
+    transition:opacity 0.12s ease;
+  }
+  .btn-route-secondary:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
 
   /* ---- Route info panel ---- */
   #route-panel{
@@ -696,6 +779,8 @@
 
 <button id="feedback-toggle" onclick="openFeedbackModal()">✎</button>
 
+<button id="route-planner-toggle" onclick="openRoutePlannerModal()">🗺</button>
+
 <div id="feedback-modal">
   <div class="feedback-box">
     <h3>Send feedback</h3>
@@ -704,6 +789,33 @@
     <div class="feedback-actions">
       <button class="feedback-cancel" onclick="closeFeedbackModal()">Cancel</button>
       <button class="btn-route" onclick="sendFeedback()">Send</button>
+    </div>
+  </div>
+</div>
+
+<div id="photo-submit-modal" class="modal-overlay">
+  <div class="feedback-box">
+    <h3 id="photo-submit-title">Submit a photo</h3>
+    <label for="photo-submit-file">Photo</label>
+    <input type="file" id="photo-submit-file" accept="image/*" capture="environment" />
+    <label for="photo-submit-year">Year taken (required)</label>
+    <input type="text" id="photo-submit-year" placeholder="e.g. 2026" inputmode="numeric" maxlength="4" required />
+    <div id="photo-submit-status"></div>
+    <div class="feedback-actions">
+      <button class="feedback-cancel" onclick="closePhotoSubmitModal()">Cancel</button>
+      <button class="btn-route" onclick="submitPhoto()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div id="route-planner-modal" class="modal-overlay">
+  <div class="feedback-box">
+    <h3>Plan a multi-stop route</h3>
+    <div id="site-picker-list" class="site-picker-list"></div>
+    <div id="route-planner-status"></div>
+    <div class="feedback-actions">
+      <button class="feedback-cancel" onclick="closeRoutePlannerModal()">Cancel</button>
+      <button class="btn-route" onclick="generateMultiRoute()">Generate route</button>
     </div>
   </div>
 </div>
@@ -758,7 +870,12 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
+
+// The same Apps Script Web App URL used for the Kobo → GitHub sync — it now
+// also accepts public photo submissions from this app, routed by a "type"
+// field in the request. Paste it in once you've deployed the updated script.
+const SYNC_ENDPOINT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 /* ============================================================
    2. MAP SETUP
@@ -973,6 +1090,7 @@ document.addEventListener('keydown', (e) => {
    4. LOAD SITES FROM GOOGLE SHEET, THEN BUILD MARKERS + POPUPS
    ============================================================ */
 const markers = {};
+let allSites = [];
 const statusEl = document.getElementById('status-msg');
 
 async function loadSites(){
@@ -1043,6 +1161,8 @@ function buildMarkers(sites){
     return;
   }
 
+  allSites = sites;
+
   sites.forEach(site => {
     const marker = L.marker([site.lat, site.lng], { icon: iconFor(site.safety) }).addTo(map);
 
@@ -1063,6 +1183,9 @@ function buildMarkers(sites){
         <p class="popup-desc">${site.description || ''}</p>
         <button class="btn-route" onclick="routeTo(${site.lat}, ${site.lng}, '${escapedName}')">
           Get directions
+        </button>
+        <button class="btn-route-secondary" onclick="openPhotoSubmitModal(${site.id})">
+          Submit a photo
         </button>
       </div>
     `;
@@ -1121,6 +1244,7 @@ function routeTo(destLat, destLng, destName){
   }
 
   map.closePopup();
+  document.getElementById('route-mode-toggle').style.display = '';
 
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const userLat = pos.coords.latitude;
@@ -1227,6 +1351,7 @@ function clearRoute(){
   currentRouteContext = null;
   currentRouteMode = 'hybrid';
   updateRouteModeToggleLabel();
+  document.getElementById('route-mode-toggle').style.display = ''; // restore in case a multi-stop route hid it
   document.getElementById('route-panel').classList.remove('show');
 }
 
@@ -1308,6 +1433,193 @@ async function sendFeedback(){
 document.getElementById('feedback-modal').addEventListener('click', (e) => {
   if (e.target.id === 'feedback-modal') closeFeedbackModal();
 });
+
+/* ============================================================
+   9. PUBLIC PHOTO SUBMISSION
+   ------------------------------------------------------------
+   Anyone viewing the map can submit a photo for a specific mural.
+   The image + which site it's for get sent to the same Apps Script
+   used for the Kobo sync, which uploads it to GitHub and drops it
+   into that site's next empty photo slot in the Sheet — matched by
+   exact name, since the site was picked directly from data the app
+   already loaded (no guessing needed, unlike the Kobo pipeline).
+
+   No login/moderation gate on this by design, per how it was asked
+   for — worth knowing that means anyone can submit anything; add a
+   review step later if that becomes a problem.
+   ============================================================ */
+const MAX_PHOTO_MB = 8;
+let photoSubmitSite = null;
+
+function openPhotoSubmitModal(siteId){
+  photoSubmitSite = allSites.find(s => s.id === siteId);
+  if (!photoSubmitSite) return;
+
+  document.getElementById('photo-submit-title').textContent = `Submit a photo — ${photoSubmitSite.name}`;
+  document.getElementById('photo-submit-file').value = '';
+  document.getElementById('photo-submit-year').value = '';
+  document.getElementById('photo-submit-status').textContent = '';
+  map.closePopup();
+  document.getElementById('photo-submit-modal').classList.add('show');
+}
+
+function closePhotoSubmitModal(){
+  document.getElementById('photo-submit-modal').classList.remove('show');
+  photoSubmitSite = null;
+}
+
+async function submitPhoto(){
+  const fileInput = document.getElementById('photo-submit-file');
+  const yearInput = document.getElementById('photo-submit-year');
+  const statusEl = document.getElementById('photo-submit-status');
+  const file = fileInput.files[0];
+  const year = yearInput.value.trim();
+
+  if (!photoSubmitSite) { statusEl.textContent = 'Something went wrong — please reopen this from the mural popup.'; return; }
+  if (!file) { statusEl.textContent = 'Choose a photo first.'; return; }
+  if (!file.type.startsWith('image/')) { statusEl.textContent = 'Please choose an image file.'; return; }
+  if (file.size > MAX_PHOTO_MB * 1024 * 1024) { statusEl.textContent = `That photo is too large — please choose one under ${MAX_PHOTO_MB}MB.`; return; }
+  if (!/^[12]\d{3}$/.test(year)) { statusEl.textContent = 'Enter the year the photo was taken (e.g. 2026).'; return; }
+  if (!navigator.onLine) { statusEl.textContent = "You're offline — submitting a photo needs a connection."; return; }
+  if (SYNC_ENDPOINT_URL.includes('PASTE_YOUR')) { statusEl.textContent = 'Photo submission is not set up yet.'; return; }
+
+  statusEl.textContent = 'Uploading…';
+
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const base64Content = dataUrl.split(',')[1]; // strip the "data:image/...;base64," prefix
+
+    const res = await fetch(SYNC_ENDPOINT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight
+      body: JSON.stringify({
+        type: 'photo-submission',
+        siteName: photoSubmitSite.name,
+        filename: file.name,
+        year: year,
+        imageBase64: base64Content
+      })
+    });
+
+    const result = await res.json();
+    if (result.success) {
+      statusEl.textContent = "Thanks! Your photo is awaiting review before it appears on the map.";
+      setTimeout(closePhotoSubmitModal, 1800);
+    } else {
+      statusEl.textContent = result.error || 'Submission failed — please try again.';
+    }
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Couldn't submit right now — check your connection and try again.";
+  }
+}
+
+document.getElementById('photo-submit-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'photo-submit-modal') closePhotoSubmitModal();
+});
+
+/* ============================================================
+   10. MULTI-STOP ROUTE PLANNER
+   ------------------------------------------------------------
+   Lets someone pick several murals and generates one driving route
+   visiting all of them in an efficient order, using OSRM's free
+   "Trip" service (a separate endpoint from normal routing — this
+   one actually solves "what order should I visit these in", not
+   just "route from A to B").
+   ============================================================ */
+function openRoutePlannerModal(){
+  const listEl = document.getElementById('site-picker-list');
+  listEl.innerHTML = allSites.map(s => `
+    <div class="site-picker-item">
+      <input type="checkbox" id="pick-${s.id}" value="${s.id}" class="route-planner-checkbox" />
+      <label for="pick-${s.id}">${s.name}</label>
+    </div>
+  `).join('');
+  document.getElementById('route-planner-status').textContent = '';
+  document.getElementById('route-planner-modal').classList.add('show');
+}
+
+function closeRoutePlannerModal(){
+  document.getElementById('route-planner-modal').classList.remove('show');
+}
+
+function generateMultiRoute(){
+  const statusEl = document.getElementById('route-planner-status');
+  const checkedIds = Array.from(document.querySelectorAll('.route-planner-checkbox:checked')).map((cb) => cb.value);
+
+  if (checkedIds.length < 2) { statusEl.textContent = 'Select at least 2 murals.'; return; }
+  if (!navigator.onLine) { statusEl.textContent = "You're offline — planning a route needs a connection."; return; }
+
+  statusEl.textContent = 'Finding your location…';
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const userLat = pos.coords.latitude;
+    const userLng = pos.coords.longitude;
+    const selectedSites = checkedIds.map((id) => allSites.find((s) => String(s.id) === id)).filter(Boolean);
+
+    closeRoutePlannerModal();
+    map.closePopup();
+
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker([userLat, userLng], {
+      radius: 7, color: '#31D8C9', fillColor: '#31D8C9', fillOpacity: 1, weight: 2
+    }).addTo(map).bindPopup('You are here');
+
+    const coordsStr = [`${userLng},${userLat}`, ...selectedSites.map((s) => `${s.lng},${s.lat}`)].join(';');
+    const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&roundtrip=false&overview=full&geometries=geojson`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.trips || !data.trips.length) {
+        alert('Could not generate a route for those murals.');
+        return;
+      }
+
+      const trip = data.trips[0];
+      const coords = trip.geometry.coordinates.map((c) => [c[1], c[0]]);
+
+      if (routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.polyline(coords, { color: '#31D8C9', weight: 5, opacity: 0.9 }).addTo(map);
+      map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
+
+      // waypoints[0] is the user's start point; the rest correspond to
+      // selectedSites in their ORIGINAL order, each carrying its position
+      // in the OPTIMIZED visiting sequence via waypoint_index
+      const stopOrder = data.waypoints.slice(1)
+        .map((wp, i) => ({ name: selectedSites[i].name, order: wp.waypoint_index }))
+        .sort((a, b) => a.order - b.order)
+        .map((s, i) => `${i + 1}. ${s.name}`);
+
+      const km = (trip.distance / 1000).toFixed(1);
+      const mins = Math.round(trip.duration / 60);
+
+      document.getElementById('r-title').textContent = `${selectedSites.length}-stop driving route`;
+      document.getElementById('r-stats').textContent = `${stopOrder.join(' → ')}  —  ${km} km · ~${mins} min`;
+      document.getElementById('route-mode-toggle').style.display = 'none'; // drive+walk toggle doesn't apply to multi-stop
+      document.getElementById('route-panel').classList.add('show');
+
+    } catch (err) {
+      console.error(err);
+      alert('Could not generate a route right now. Please try again.');
+    }
+  }, () => {
+    statusEl.textContent = 'Could not get your location. Please allow location access and try again.';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+document.getElementById('route-planner-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'route-planner-modal') closeRoutePlannerModal();
+});
+
+
+
 
 /* ============================================================
    7. COMPASS / HEADING-FOLLOW MODE
