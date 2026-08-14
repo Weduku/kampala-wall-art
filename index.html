@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kampala Wall Art — Mural &amp; Graffiti Map</title>
 
 <link rel="manifest" href="manifest.json">
@@ -47,11 +47,18 @@
   }
   #map-rotate-wrapper{
     position:absolute;
-    top:-50%; left:-50%;
-    width:200%; height:200%;
+    inset:0;
     transform-origin:50% 50%;
     transition:transform 0.35s linear;
     will-change:transform;
+  }
+  /* Only while actively following a heading does the map need to be
+     oversized (to avoid black edges at non-zero rotation) — at rest,
+     it stays normal-sized so Leaflet's own centering/auto-pan behaves
+     exactly as it did before the compass feature existed. */
+  #map-rotate-wrapper.rotating{
+    top:-50%; left:-50%;
+    width:200%; height:200%;
   }
 
   #zoom-controls{
@@ -83,22 +90,20 @@
     z-index:1000;
     width:40px; height:40px;
     border-radius:50%;
-    border:1px solid var(--line);
-    background:var(--ink-2);
-    color:var(--chalk-dim);
+    border:1px solid rgba(0,0,0,0.15);
+    background:#FFFFFF;
+    color:#111214;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer;
     box-shadow:0 4px 12px rgba(0,0,0,0.3);
-    transition:color 0.15s ease, border-color 0.15s ease;
+    transition:opacity 0.15s ease, border-color 0.15s ease;
   }
-  #compass-toggle:hover{ color:var(--chalk); }
+  #compass-toggle:hover{ opacity:0.85; }
   #compass-toggle.active{
-    border-color:var(--cyan);
-    color:var(--cyan);
+    border:2px solid var(--cyan);
   }
   #compass-toggle.locked{
-    border-color:var(--amber);
-    color:var(--amber);
+    border:2px solid var(--amber);
   }
   #compass-needle{
     font-size:16px;
@@ -112,16 +117,16 @@
     z-index:1000;
     width:40px; height:40px;
     border-radius:50%;
-    border:1px solid var(--line);
-    background:var(--ink-2);
-    color:var(--chalk-dim);
+    border:1px solid rgba(0,0,0,0.15);
+    background:#FFFFFF;
+    color:#111214;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer;
     font-size:16px;
     box-shadow:0 4px 12px rgba(0,0,0,0.3);
-    transition:color 0.15s ease;
+    transition:opacity 0.15s ease;
   }
-  #feedback-toggle:hover{ color:var(--chalk); }
+  #feedback-toggle:hover{ opacity:0.85; }
 
   #route-planner-toggle{
     position:absolute;
@@ -366,10 +371,12 @@
     color:#fff;
     font-family:'JetBrains Mono', monospace;
     font-size:11px;
-    font-weight:600;
+    font-weight:700;
     padding:3px 7px;
     border-radius:4px;
     letter-spacing:0.4px;
+    border:1px solid rgba(255,255,255,0.35);
+    box-shadow:0 1px 4px rgba(0,0,0,0.5);
   }
   .gallery-dots{
     position:absolute;
@@ -871,12 +878,12 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 // The same Apps Script Web App URL used for the Kobo → GitHub sync — it now
 // also accepts public photo submissions from this app, routed by a "type"
 // field in the request. Paste it in once you've deployed the updated script.
-const SYNC_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwzvf3nJrPtDQbjGP0WFJWsPoAS2WfSksyLKKqOKWjSNkdE0dH3hh30yWo0vnDsOhbn/exec";
+const SYNC_ENDPOINT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 /* ============================================================
    2. MAP SETUP
@@ -1660,14 +1667,16 @@ function initCompass(){
     compassToggleBtn.style.display = 'none'; // no location support at all
     return;
   }
-  startFollowing(false);
+  // No auto-start: heading-follow is opt-in via tapping the button. This
+  // keeps the map behaving completely normally (full panning, no rotation,
+  // no dragging restrictions) until someone explicitly asks for it.
 }
 
 function toggleHeadingMode(){
   if (headingMode === 'following') {
     lockToNorth();
   } else {
-    startFollowing(true); // user-initiated tap — safe to request iOS compass permission here
+    startFollowing(true); // always a real tap now — safe to request iOS compass permission here
   }
 }
 
@@ -1677,6 +1686,7 @@ function startFollowing(userInitiated){
   compassToggleBtn.classList.remove('locked');
   compassToggleBtn.classList.add('active');
   compassNeedle.textContent = '▲';
+  mapWrapper.classList.add('rotating'); // oversize the map now, only while actually rotating
 
   // Leaflet has no idea the map is visually rotated (that's done purely
   // with a CSS transform on top of it) — so its drag handling still tracks
@@ -1733,6 +1743,7 @@ function lockToNorth(){
   compassNeedle.textContent = 'N';
   map.closePopup(); // avoid a rotated-looking popup mid-transition
   map.dragging.enable(); // rotation is back to 0° here, so normal dragging works correctly again
+  mapWrapper.classList.remove('rotating'); // back to normal map size — restores correct autoPan/centering
   applyHeadingRotation(0);
 }
 
