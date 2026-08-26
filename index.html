@@ -475,58 +475,6 @@
   }
   .btn-route-secondary:hover{ opacity:0.85; border-color:var(--chalk-dim); }
 
-  /* ---- Route info panel ---- */
-  #route-panel{
-    position:absolute;
-    bottom:18px; left:18px;
-    z-index:1000;
-    background:var(--ink-2);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:14px 16px;
-    max-width:280px;
-    display:none;
-    box-shadow:0 8px 24px rgba(0,0,0,0.35);
-  }
-  #route-panel.show{ display:block; }
-  .route-panel-top{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:6px;
-  }
-  #route-panel .r-title{
-    font-family:'Archivo Black', sans-serif;
-    font-size:13px;
-    text-transform:uppercase;
-    margin:0;
-  }
-  .route-mode-toggle{
-    flex-shrink:0;
-    background:transparent;
-    border:1px solid var(--line);
-    color:var(--chalk-dim);
-    font-family:'JetBrains Mono', monospace;
-    font-size:10px;
-    padding:4px 8px;
-    border-radius:6px;
-    cursor:pointer;
-    white-space:nowrap;
-  }
-  .route-mode-toggle:hover{ color:var(--chalk); border-color:var(--chalk-dim); }
-  #route-panel .r-stats{
-    font-family:'JetBrains Mono', monospace;
-    font-size:12px;
-    color:var(--chalk-dim);
-    margin:0 0 10px;
-  }
-  #route-panel .r-close{
-    background:none; border:1px solid var(--line); color:var(--chalk-dim);
-    border-radius:6px; padding:5px 10px; font-size:11px; cursor:pointer;
-  }
-  #route-panel .r-close:hover{ color:var(--chalk); }
-
   /* ---- Attribution tweak ---- */
   .leaflet-control-attribution{
     background:rgba(23,24,28,0.75) !important;
@@ -841,15 +789,6 @@
   <div class="item"><span class="dot unsafe"></span>Unsafe</div>
 </div>
 
-<div id="route-panel">
-  <div class="route-panel-top">
-    <div class="r-title" id="r-title">Route</div>
-    <button id="route-mode-toggle" class="route-mode-toggle" onclick="toggleRouteMode()">Walk all the way</button>
-  </div>
-  <div class="r-stats" id="r-stats"></div>
-  <button class="r-close" onclick="clearRoute()">Clear route</button>
-</div>
-
 <div id="status-msg">Loading murals…</div>
 
 <div id="lightbox">
@@ -878,12 +817,12 @@
    filename (e.g. "Herman Padel Mural_2026.jpg"), so older photos
    named that way still show a year badge with no sheet changes needed.
    ============================================================ */
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbp3udF6ZXfhLHFJlDHMgX3dPuXZfoFETSJfccvLDxRKm3Yy2xE8zPPVOK68ufjo89w-52Qp0D9QOM/pub?gid=0&single=true&output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSCy8tu_hnQQCEM7IEnqk8hZBqx1VmzPCBnuJ63DPp0SpEtZpYsuQaIjzxuxBLxA7CfLyDqRV4jJfHm/pub?gid=39275781&single=true&output=csv";
 
 // The same Apps Script Web App URL used for the Kobo → GitHub sync — it now
 // also accepts public photo submissions from this app, routed by a "type"
 // field in the request. Paste it in once you've deployed the updated script.
-const SYNC_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwM3uwyi7jVvC6zv9ZC66AFc7d1nv1eJpa7prdSzI8rgtklTtjTkNiYD2bxyNN9addO/exec";
+const SYNC_ENDPOINT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
 /* ============================================================
    2. MAP SETUP
@@ -1220,155 +1159,18 @@ function buildMarkers(sites){
 loadSites();
 
 /* ============================================================
-   5. ROUTING (free — OSRM public demo server, no API key)
+   5. ROUTING — hands off to Google Maps for actual navigation
    ------------------------------------------------------------
-   Automatic mode: drive as far as a road reaches, then walk the
-   rest of the way if the site sits off-road (footpaths, slums, etc).
-   A corner toggle on the route panel switches to walking the whole way.
+   No location permission or geolocation needed here: Google Maps
+   auto-detects the person's current location itself once it opens,
+   which is more reliable than anything this app could do on its own.
+   Tapping "Get directions" just opens Google Maps (app if installed,
+   website otherwise) with the destination pre-filled.
    ============================================================ */
-let routeLayer = null;
-let userMarker = null;
-let currentRouteContext = null; // {userLat, userLng, destLat, destLng, destName}
-let currentRouteMode = 'hybrid';
-
-function haversineMeters(lat1, lng1, lat2, lng2){
-  const R = 6371000;
-  const toRad = d => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-async function fetchOsrmRoute(profile, fromLat, fromLng, toLat, toLng){
-  const url = `https://router.project-osrm.org/route/v1/${profile}/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Routing request failed: ' + res.status);
-  const data = await res.json();
-  if (!data.routes || !data.routes.length) throw new Error('No route found');
-  return { route: data.routes[0], waypoints: data.waypoints };
-}
-
 function routeTo(destLat, destLng, destName){
-  if (!navigator.onLine) {
-    alert("Directions need an internet connection. You can still browse murals and their photos offline.");
-    return;
-  }
-
-  if (!navigator.geolocation) {
-    alert('Your browser does not support location. Try a different device/browser.');
-    return;
-  }
-
   map.closePopup();
-  document.getElementById('route-mode-toggle').style.display = '';
-
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    const userLat = pos.coords.latitude;
-    const userLng = pos.coords.longitude;
-
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker([userLat, userLng], {
-      radius: 7, color: '#31D8C9', fillColor: '#31D8C9', fillOpacity: 1, weight: 2
-    }).addTo(map).bindPopup('You are here');
-
-    currentRouteContext = { userLat, userLng, destLat, destLng, destName };
-    currentRouteMode = 'hybrid';
-    updateRouteModeToggleLabel();
-
-    await drawHybridRoute(userLat, userLng, destLat, destLng, destName);
-  }, () => {
-    alert('Could not get your location. Please allow location access and try again.');
-  }, { enableHighAccuracy: true, timeout: 10000 });
-}
-
-// Corner toggle in the route panel — switches between the automatic
-// drive+walk route and a walking-only route for the same trip
-function toggleRouteMode(){
-  if (!currentRouteContext) return;
-  const { userLat, userLng, destLat, destLng, destName } = currentRouteContext;
-
-  if (currentRouteMode === 'hybrid') {
-    currentRouteMode = 'walk';
-    drawWalkingRoute(userLat, userLng, destLat, destLng, destName);
-  } else {
-    currentRouteMode = 'hybrid';
-    drawHybridRoute(userLat, userLng, destLat, destLng, destName);
-  }
-  updateRouteModeToggleLabel();
-}
-
-function updateRouteModeToggleLabel(){
-  const btn = document.getElementById('route-mode-toggle');
-  if (!btn) return;
-  btn.textContent = currentRouteMode === 'hybrid' ? 'Walk all the way' : 'Drive + walk instead';
-}
-
-async function drawWalkingRoute(userLat, userLng, destLat, destLng, destName){
-  try {
-    const { route } = await fetchOsrmRoute('foot', userLat, userLng, destLat, destLng);
-    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.polyline(coords, { color: '#31D8C9', weight: 5, opacity: 0.9 }).addTo(map);
-    map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
-
-    const km = (route.distance / 1000).toFixed(2);
-    const mins = Math.round(route.duration / 60);
-    document.getElementById('r-title').textContent = `Walking to ${destName}`;
-    document.getElementById('r-stats').textContent = `${km} km · ~${mins} min on foot`;
-    document.getElementById('route-panel').classList.add('show');
-
-  } catch (err) {
-    console.error(err);
-    alert('Could not find a walking route to this site.');
-  }
-}
-
-async function drawHybridRoute(userLat, userLng, destLat, destLng, destName){
-  try {
-    const { route: driveRoute, waypoints } = await fetchOsrmRoute('driving', userLat, userLng, destLat, destLng);
-    const snapLng = waypoints[1].location[0];
-    const snapLat = waypoints[1].location[1];
-    const gapMeters = haversineMeters(snapLat, snapLng, destLat, destLng);
-
-    const driveCoords = driveRoute.geometry.coordinates.map(c => [c[1], c[0]]);
-    const layers = [L.polyline(driveCoords, { color: '#F5B729', weight: 5, opacity: 0.85 })];
-    const statsParts = [`${(driveRoute.distance/1000).toFixed(1)} km drive (~${Math.round(driveRoute.duration/60)} min)`];
-    let title = `Driving to ${destName}`;
-
-    // If the nearest road is meaningfully far from the actual site, walk the rest of the way
-    if (gapMeters > 60) {
-      const { route: walkRoute } = await fetchOsrmRoute('foot', snapLat, snapLng, destLat, destLng);
-      const walkCoords = walkRoute.geometry.coordinates.map(c => [c[1], c[0]]);
-      layers.push(L.polyline(walkCoords, { color: '#31D8C9', weight: 5, opacity: 0.9, dashArray: '6 6' }));
-      statsParts.push(`${(walkRoute.distance/1000).toFixed(2)} km walk (~${Math.round(walkRoute.duration/60)} min)`);
-      title = `Drive + walk to ${destName}`;
-    }
-
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.layerGroup(layers).addTo(map);
-
-    const allLatLngs = layers.flatMap(l => l.getLatLngs());
-    map.fitBounds(L.latLngBounds(allLatLngs), { padding: [60, 60] });
-
-    document.getElementById('r-title').textContent = title;
-    document.getElementById('r-stats').textContent = statsParts.join('  +  ');
-    document.getElementById('route-panel').classList.add('show');
-
-  } catch (err) {
-    console.warn('Driving route unavailable, falling back to walking directions', err);
-    await drawWalkingRoute(userLat, userLng, destLat, destLng, destName);
-  }
-}
-
-function clearRoute(){
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
-  if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
-  currentRouteContext = null;
-  currentRouteMode = 'hybrid';
-  updateRouteModeToggleLabel();
-  document.getElementById('route-mode-toggle').style.display = ''; // restore in case a multi-stop route hid it
-  document.getElementById('route-panel').classList.remove('show');
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}&travelmode=driving`;
+  window.open(url, '_blank');
 }
 
 /* ============================================================
@@ -1581,6 +1383,7 @@ function generateMultiRoute(){
   const checkedIds = Array.from(document.querySelectorAll('.route-planner-checkbox:checked')).map((cb) => cb.value);
 
   if (checkedIds.length < 2) { statusEl.textContent = 'Select at least 2 murals.'; return; }
+  if (checkedIds.length > 10) { statusEl.textContent = 'Google Maps supports up to 10 stops at once — please select fewer.'; return; }
   if (!navigator.onLine) { statusEl.textContent = "You're offline — planning a route needs a connection."; return; }
 
   statusEl.textContent = 'Finding your location…';
@@ -1590,52 +1393,45 @@ function generateMultiRoute(){
     const userLng = pos.coords.longitude;
     const selectedSites = checkedIds.map((id) => allSites.find((s) => String(s.id) === id)).filter(Boolean);
 
-    closeRoutePlannerModal();
-    map.closePopup();
+    statusEl.textContent = 'Working out the best order…';
 
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker([userLat, userLng], {
-      radius: 7, color: '#31D8C9', fillColor: '#31D8C9', fillOpacity: 1, weight: 2
-    }).addTo(map).bindPopup('You are here');
-
+    // OSRM's free Trip service solves "what order should I visit these in" —
+    // something Google Maps' free link can't do on its own. Once we have
+    // that order, Google Maps takes over for the actual turn-by-turn nav.
     const coordsStr = [`${userLng},${userLat}`, ...selectedSites.map((s) => `${s.lng},${s.lat}`)].join(';');
-    const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&roundtrip=false&overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&roundtrip=false`;
 
     try {
       const res = await fetch(url);
       const data = await res.json();
 
       if (!data.trips || !data.trips.length) {
-        alert('Could not generate a route for those murals.');
+        statusEl.textContent = 'Could not work out an order for those murals. Please try again.';
         return;
       }
-
-      const trip = data.trips[0];
-      const coords = trip.geometry.coordinates.map((c) => [c[1], c[0]]);
-
-      if (routeLayer) map.removeLayer(routeLayer);
-      routeLayer = L.polyline(coords, { color: '#31D8C9', weight: 5, opacity: 0.9 }).addTo(map);
-      map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
 
       // waypoints[0] is the user's start point; the rest correspond to
       // selectedSites in their ORIGINAL order, each carrying its position
       // in the OPTIMIZED visiting sequence via waypoint_index
-      const stopOrder = data.waypoints.slice(1)
-        .map((wp, i) => ({ name: selectedSites[i].name, order: wp.waypoint_index }))
+      const orderedSites = data.waypoints.slice(1)
+        .map((wp, i) => ({ site: selectedSites[i], order: wp.waypoint_index }))
         .sort((a, b) => a.order - b.order)
-        .map((s, i) => `${i + 1}. ${s.name}`);
+        .map((s) => s.site);
 
-      const km = (trip.distance / 1000).toFixed(1);
-      const mins = Math.round(trip.duration / 60);
+      closeRoutePlannerModal();
 
-      document.getElementById('r-title').textContent = `${selectedSites.length}-stop driving route`;
-      document.getElementById('r-stats').textContent = `${stopOrder.join(' → ')}  —  ${km} km · ~${mins} min`;
-      document.getElementById('route-mode-toggle').style.display = 'none'; // drive+walk toggle doesn't apply to multi-stop
-      document.getElementById('route-panel').classList.add('show');
+      const destination = orderedSites[orderedSites.length - 1];
+      const waypointSites = orderedSites.slice(0, -1);
+      const waypointsStr = waypointSites.map((s) => `${s.lat},${s.lng}`).join('|');
+
+      let mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${destination.lat},${destination.lng}&travelmode=driving`;
+      if (waypointsStr) mapsUrl += `&waypoints=${encodeURIComponent(waypointsStr)}`;
+
+      window.open(mapsUrl, '_blank');
 
     } catch (err) {
       console.error(err);
-      alert('Could not generate a route right now. Please try again.');
+      statusEl.textContent = 'Could not generate a route right now. Please try again.';
     }
   }, () => {
     statusEl.textContent = 'Could not get your location. Please allow location access and try again.';
